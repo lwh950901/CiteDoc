@@ -14,7 +14,7 @@ export async function POST() {
     // 使用 Vercel AI SDK 流式返回固定的测试消息
     // 验证 DeepSeek 连接和 Streaming 管道是否正常工作
     const result = streamText({
-      model: deepseek("deepseek-chat"),
+      model: deepseek("deepseek-v4-flash"),
       system:
         "You are a test assistant. Reply ONLY with the following exact message, nothing else.",
       prompt:

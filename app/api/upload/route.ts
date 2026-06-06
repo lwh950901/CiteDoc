@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { documents } from "@/db/schema";
+import { documents, chunks } from "@/db/schema";
 import { parseDocument } from "@/lib/parser";
 import type { ParseResult } from "@/lib/parser";
+import { splitTextWithMeta } from "@/lib/splitter";
 
 // 允许的文件 MIME 类型
 const ALLOWED_TYPES = [
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     const { fullText, segments, pageCount } = parseResult;
 
-    // ---- 6. 存入数据库 ----
+    // ---- 6. 存入 documents 表 ----
     const [doc] = await db
       .insert(documents)
       .values({
@@ -77,12 +78,35 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // ---- 7. 返回结果 ----
+    // ---- 7. 文本切分 + 存入 chunks 表 ----
+    let chunkCount = 0;
+    if (segments.length > 0) {
+      const chunksResult = splitTextWithMeta(
+        segments,
+        500,   // chunkSize
+        50,    // overlap
+        doc.id // documentId
+      );
+
+      for (const chunk of chunksResult) {
+        await db.insert(chunks).values({
+          documentId: chunk.metadata.documentId,
+          content: chunk.content,
+          metadata: JSON.stringify(chunk.metadata),
+          // embedding 暂不生成，留给 Phase 4 向量化
+        });
+      }
+
+      chunkCount = chunksResult.length;
+    }
+
+    // ---- 8. 返回结果 ----
     return NextResponse.json({
       documentId: doc.id,
       name: doc.name,
       pageCount,
       segments,
+      chunkCount,
     });
   } catch (error) {
     console.error("Upload API error:", error);

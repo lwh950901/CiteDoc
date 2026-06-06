@@ -28,4 +28,4 @@
 - [x] 4.2 TypeScript 编译检查（`npx tsc --noEmit` 零错误）
 - [x] 4.3 使用 curl 上传测试 PDF，验证 segments 的 charStart/charEnd 连续覆盖全文
 - [x] 4.4 使用 curl 上传测试 Word 文档，验证解析正确
-- [ ] 4.5 浏览器验证：上传 + 错误提示 + 成功预览（需在浏览器中手动验证）
+- [x] 4.5 浏览器验证：上传 + 错误提示 + 成功预览（浏览器 MCP 验证）
