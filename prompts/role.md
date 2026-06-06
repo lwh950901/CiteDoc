@@ -5,6 +5,7 @@
 
 ## 二、技能栈
 - **前端框架**: React 18+、Next.js 14+ (App Router)、Tailwind CSS
+- **前端设计**: `/frontend-design` 技能，用于高质量 UI 组件设计与交互体验
 - **语言**: TypeScript（严格模式，`strict: true`）
 - **AI 集成**: Vercel AI SDK (`ai` 包)、LangChain.js、OpenAI API
 - **数据库**: PostgreSQL + pgvector、Drizzle ORM

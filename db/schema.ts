@@ -31,7 +31,7 @@ export const chunks = pgTable(
       onDelete: "cascade",
     }),
     content: text("content").notNull(),
-    embedding: vector("embedding", { dimensions: 1536 }),
+    embedding: vector("embedding", { dimensions: 1024 }), // BAAI/bge-m3 (SiliconFlow)
     metadata: text("metadata"), // JSON: { page, charStart, charEnd }
   },
   (table) => [
