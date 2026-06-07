@@ -23,21 +23,29 @@ interface DocInfo {
 
 interface DocumentViewerProps {
   documentId: string;
+  documentName?: string | null;
   activeChunkId: string | null;
+  onReplace?: () => void;
 }
 
 // ---- Component ----
 
 export default function DocumentViewer({
   documentId,
+  documentName,
   activeChunkId,
+  onReplace,
 }: DocumentViewerProps) {
   const [fullText, setFullText] = useState("");
   const [chunks, setChunks] = useState<ChunkMeta[]>([]);
   const [docName, setDocName] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [truncated, setTruncated] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // 原文超长截断阈值（500KB）
+  const MAX_TEXT_LENGTH = 500_000;
 
   // ---- 加载文档和 chunks ----
 
@@ -63,7 +71,14 @@ export default function DocumentViewer({
         }
 
         const doc: DocInfo = await docRes.json();
-        setFullText(doc.content);
+        const text = doc.content;
+        if (text.length > MAX_TEXT_LENGTH) {
+          setFullText(text.slice(0, MAX_TEXT_LENGTH));
+          setTruncated(true);
+        } else {
+          setFullText(text);
+          setTruncated(false);
+        }
         setDocName(doc.name);
 
         if (chunksRes.ok) {
@@ -203,30 +218,67 @@ export default function DocumentViewer({
   // ---- 渲染 ----
 
   return (
-    <div className="h-full flex flex-col">
-      {/* 文档标题 */}
-      {docName && (
-        <div className="text-xs text-gray-400 mb-2 truncate px-1">
-          📄 {docName}
+    <div className="flex flex-col min-h-0 w-full">
+      {/* 文档标题 + 操作 */}
+      {(docName || documentName) && (
+        <div className="flex items-center gap-2 mb-1.5 shrink-0">
+          <span className="text-xs font-medium truncate flex-1 min-w-0" style={{fontFamily: 'DM Sans, sans-serif', color: 'var(--color-text-primary)'}}>
+            {docName || documentName}
+          </span>
+          {onReplace && (
+            <button
+              onClick={onReplace}
+              className="text-xs px-2.5 py-1 rounded-md shrink-0 transition-all duration-200"
+              style={{
+                background: 'var(--color-bg-surface)',
+                color: 'var(--color-text-secondary)',
+                border: '1px solid var(--color-border)',
+                fontFamily: 'DM Sans, sans-serif',
+              }}
+            >
+              换文件
+            </button>
+          )}
         </div>
       )}
 
-      {/* 原文容器 */}
+      {/* 原文容器 — 撑满剩余高度 */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto p-4 border border-gray-200 rounded-lg bg-white text-gray-800"
-        style={{ maxHeight: "70vh" }}
+        className="flex-1 min-h-0 overflow-y-auto p-4 lg:p-5 rounded-xl shadow-lg"
+        style={{
+          background: 'var(--color-doc-bg)',
+          border: '1px solid var(--color-border)',
+          color: 'var(--color-doc-text)',
+          fontFamily: 'Crimson Pro, Georgia, serif',
+          fontSize: '16px',
+          lineHeight: '1.8',
+        }}
       >
         {loading && (
-          <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
-            <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-            加载文档中...
+          <div className="flex items-center gap-2 py-4 animate-breathe" style={{color: 'var(--color-text-muted)'}}>
+            <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{borderColor: 'var(--color-border)', borderTopColor: 'var(--color-accent)'}} />
+            加载文档中…
           </div>
         )}
 
         {error && (
-          <div className="text-sm text-red-500 py-4">{error}</div>
+          <div className="text-sm py-4" style={{color: 'var(--color-red)'}}>{error}</div>
         )}
+
+        {truncated && (
+          <div className="text-xs rounded-lg p-3 mb-4" style={{background: 'rgba(212,160,49,0.08)', border: '1px solid rgba(212,160,49,0.2)', color: 'var(--color-accent)'}}>
+            文档过长，仅显示前 500KB。完整内容请查看原始文件。
+          </div>
+        )}
+
+        {/* 段落分隔符暗色 */}
+        <style>{`
+          .document-viewer [class*="page-sep"] {
+            color: var(--color-text-muted) !important;
+            border-color: var(--color-border) !important;
+          }
+        `}</style>
 
         {!loading && !error && renderTextWithChunks()}
       </div>

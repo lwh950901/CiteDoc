@@ -92,12 +92,15 @@ function parseReferences(
 /**
  * POST /api/chat
  * 文档问答 SSE 流式端点：检索 → Prompt 构建 → LLM 生成 → 引用解析 → SSE 流
+ *
+ * 支持多轮对话：传入可选 history 字段，截取最近 10 条拼入 LLM messages
  */
 export async function POST(req: NextRequest) {
   try {
-    const { documentId, question } = (await req.json()) as {
+    const { documentId, question, history } = (await req.json()) as {
       documentId?: string;
       question?: string;
+      history?: { role: "user" | "assistant"; content: string }[];
     };
 
     // ---- 1. 参数校验 ----
@@ -115,14 +118,19 @@ export async function POST(req: NextRequest) {
     // ---- 3. 构建 Prompt ----
     const { systemPrompt, userMessage } = buildQAPrompt(question, retrieved);
 
-    // ---- 4. 调用 LLM（非流式，30s 超时）----
+    // ---- 4. 调用 LLM（非流式，30s 超时），支持多轮对话 ----
+    // 截取最近 10 条历史消息（5 轮对话）
+    const recentHistory = (history || []).slice(-10);
+    const messages = [
+      { role: "system" as const, content: systemPrompt },
+      ...recentHistory,
+      { role: "user" as const, content: userMessage },
+    ];
+
     const completion = await getLLMClient().chat.completions.create(
       {
         model: process.env.LLM_MODEL || "deepseek-chat",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
+        messages,
         temperature: 0.3,
       },
       { timeout: LLM_TIMEOUT_MS }

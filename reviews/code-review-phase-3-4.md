@@ -11,7 +11,7 @@
 | 严重度 | 发现 | 已修复 | 待处理 |
 |--------|------|--------|--------|
 | 🔴 Critical | 1 | 1 | 0 |
-| 🟡 High | 2 | 0 | 2 |
+| 🟡 High | 2 | 2 | 0 |
 | 🟢 Medium | 5 | 1 | 4 |
 | ⚪ Low | 5 | 1 | 4 |
 | **总计** | **13** | **3** | **10** |
@@ -43,19 +43,15 @@
 
 ## 🟡 High
 
-### H-1. embed API 不校验文档是否存在
+### H-1. embed API 不校验文档是否存在 ✅ 已修复
 
-- **文件**: [app/api/documents/[id]/embed/route.ts:15](app/api/documents/[id]/embed/route.ts#L15)
-- **问题**: `POST` 和 `GET` 端点都直接将 `documentId` 传给 `embedChunks`/`getEmbeddingProgress`，不检查文档是否存在。当传入不存在的 UUID 时，返回 `total: 0` 而非 404。
-- **影响**: 调用方收到 200 + `total:0`，无法区分"文档不存在"和"文档无 chunk"。
-- **修复**: 在 `embedChunks` 调用前增加文档存在性检查（参考 `chunks/route.ts` 的做法）。
+- **文件**: [app/api/documents/[id]/embed/route.ts](app/api/documents/[id]/embed/route.ts)
+- **状态**: embed route 已通过 `db.select().from(documents).where(eq(...))` 检查文档存在性，不存在时返回 404。
 
-### H-2. embed API 缺少 concurrency protection
+### H-2. embed API 缺少 concurrency protection ✅ 已修复
 
-- **文件**: [app/api/documents/[id]/embed/route.ts:14](app/api/documents/[id]/embed/route.ts#L14)
-- **问题**: 原 design 中决策了内存 Set 并发锁（D5），但简化需求后移除了。如果用户快速连点两次 POST，两次调用可能同时查询到相同的 pending chunks，导致重复调用 API 和重复写入。
-- **影响**: 重复 API 调用 → 浪费 SiliconFlow 额度；重复 DB 写入 → 虽然不报错但浪费时间。
-- **修复**: 至少加上简单的内存锁（设计文档中已有的方案）。
+- **文件**: [app/api/documents/[id]/embed/route.ts](app/api/documents/[id]/embed/route.ts)
+- **状态**: 已实现 `const processing = new Set<string>()` 内存锁，重复请求返回 409。
 
 ---
 

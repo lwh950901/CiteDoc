@@ -1,8 +1,8 @@
-# DocQATracer - 文档问答溯源工具
+# CiteDoc — 问文档，答有据
 
-带来源溯源的智能文档问答（RAG）Web 应用。上传 PDF/Word 文档后提问，AI 答案中的每条引用都可以点击跳转到原文对应位置并高亮显示。
+CiteDoc 是一个基于 RAG（检索增强生成）的文档问答应用。核心特色是**答案溯源**：所有 AI 生成的关键事实都会标记引用来源，用户可一键跳转到文档原文的对应段落。它不只是"回答问题"，更是"回答问题并告诉你答案在哪"。
 
-![DocQATracer](https://img.shields.io/badge/Next.js-15+-black?logo=next.js) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql)
+![CiteDoc](https://img.shields.io/badge/Next.js-15+-black?logo=next.js) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql)
 
 ## 功能特性
 
