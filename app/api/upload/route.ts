@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+
+// 必须声明 Node.js runtime：pdf-parse 使用 CJS require + Buffer，Edge runtime 不支持
+export const runtime = "nodejs";
+
+// Vercel 免费版最大上传 4.5MB
+const MAX_FILE_SIZE = 4.5 * 1024 * 1024;
 import { db } from "@/lib/db";
 import { documents, chunks } from "@/db/schema";
 import { parseDocument } from "@/lib/parser";
@@ -11,9 +17,6 @@ const ALLOWED_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ] as const;
-
-// 文件大小限制：10MB
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   try {

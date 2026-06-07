@@ -2,9 +2,15 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CiteDoc — 问文档，答有据",
+  title: "CiteDoc — Ask Documents, Get Cited Answers.",
   description:
-    "CiteDoc 是一个基于 RAG（检索增强生成）的文档问答应用。核心特色是答案溯源：所有 AI 生成的关键事实都会标记引用来源，用户可一键跳转到文档原文的对应段落。它不只是回答问题，更是回答问题并告诉你答案在哪。",
+    "CiteDoc 是一个基于 RAG（检索增强生成）的可溯源文档问答工具。上传 PDF/Word 后自由提问，AI 的每一条回答都附带精确引用角标，点击即可跳转到原文对应位置并高亮——让每一条答案都有据可查。",
+  openGraph: {
+    title: "CiteDoc — Ask Documents, Get Cited Answers.",
+    description:
+      "可溯源智能文档问答工具。上传文档，提问，追溯每一条答案的原文出处。",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

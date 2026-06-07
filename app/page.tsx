@@ -17,7 +17,7 @@ function DocUploadPanel({ onUpload }: { onUpload: (docId: string, name: string) 
     const file = fileRef.current?.files?.[0];
     if (!file) return;
     if (!ALLOWED.includes(file.type)) { setError("仅支持 PDF 和 DOCX 文件"); return; }
-    if (file.size > 10 * 1024 * 1024) { setError("文件不能超过 10MB"); return; }
+    if (file.size > 4.5 * 1024 * 1024) { setError("文件不能超过 4.5MB"); return; }
     setUploading(true);
     setError("");
     const fd = new FormData();
