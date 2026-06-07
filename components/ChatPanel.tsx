@@ -18,6 +18,9 @@ interface ChatPanelProps {
   onSourceClick: (source: Source) => void;
   disabled?: boolean;
   disabledReason?: string;
+  llmCredentials?: { apiKey: string; model: string };
+  onEditLlmConfig?: () => void;
+  showEditLlmConfig?: boolean;
 }
 
 type PanelState = "idle" | "loading" | "done" | "error";
@@ -49,6 +52,9 @@ export default function ChatPanel({
   onSourceClick,
   disabled = false,
   disabledReason,
+  llmCredentials,
+  onEditLlmConfig,
+  showEditLlmConfig = false,
 }: ChatPanelProps) {
   const [question, setQuestion] = useState("");
   const [state, setState] = useState<PanelState>("idle");
@@ -184,10 +190,20 @@ export default function ChatPanel({
     setMessages((prev) => [...prev, loadingMsg]);
 
     try {
+      const body: Record<string, unknown> = {
+        documentId,
+        question: q,
+        history,
+      };
+      if (llmCredentials) {
+        body.llmApiKey = llmCredentials.apiKey;
+        body.llmModel = llmCredentials.model;
+      }
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId, question: q, history }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
 
@@ -319,7 +335,7 @@ export default function ChatPanel({
       }
       setState("error");
     }
-  }, [question, documentId, state]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [question, documentId, state, llmCredentials]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- 角标渲染 ----
 
@@ -368,6 +384,19 @@ export default function ChatPanel({
 
   return (
     <div className="w-full flex flex-col min-h-0">
+      {showEditLlmConfig && onEditLlmConfig && (
+        <div className="flex justify-end mb-2 shrink-0">
+          <button
+            type="button"
+            onClick={onEditLlmConfig}
+            className="text-xs opacity-50 hover:opacity-80 transition-opacity"
+            style={{ color: "var(--color-accent)", fontFamily: "DM Sans, sans-serif" }}
+          >
+            修改 LLM 配置
+          </button>
+        </div>
+      )}
+
       {/* ---- 消息列表 ---- */}
       <div className="flex-1 overflow-y-auto space-y-5 mb-4 min-h-0 pr-1">
         {messages.length === 0 && state === "idle" && (

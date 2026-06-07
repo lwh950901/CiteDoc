@@ -49,11 +49,17 @@ docker-compose up -d
 
 ```env
 DATABASE_URL="postgres://postgres:postgres@localhost:5432/docqa"
-LLM_API_KEY="sk-..."              # DeepSeek API Key
+LLM_API_KEY="sk-..."              # DeepSeek API Key（推荐在 env 中配置）
 LLM_BASE_URL="https://api.deepseek.com/v1"
 LLM_MODEL="deepseek-chat"
 SILICONFLOW_API_KEY="sk-..."      # SiliconFlow API Key (向量嵌入)
 ```
+
+**LLM 配置说明：**
+
+- **env 优先**：若 `.env.local` 已设置 `LLM_API_KEY`，应用会直接使用，问答区不展示配置表单。
+- **界面兜底**：若未配置 env，可在问答区填写 DeepSeek API Key 与模型（默认 `deepseek-chat`），配置保存在浏览器 `localStorage`。
+- **安全提示**：界面填写的 Key 仅适合本地演示；请勿在公共电脑上使用，生产部署请在 Vercel 环境变量中配置 `LLM_API_KEY`。
 
 ### 3. 安装 & 迁移
 
@@ -77,6 +83,7 @@ npm run dev
 │   ├── api/
 │   │   ├── upload/route.ts              # 文件上传 + 自动向量化
 │   │   ├── chat/route.ts                # SSE 流式问答
+│   │   ├── llm-config/route.ts          # LLM env 配置检测
 │   │   └── documents/
 │   │       ├── route.ts                 # 文档列表 / 补生成嵌入
 │   │       └── [id]/
@@ -89,8 +96,12 @@ npm run dev
 ├── components/
 │   ├── DocumentViewer.tsx               # 文档原文 + chunk 高亮
 │   ├── ChatPanel.tsx                    # 流式问答 + 打字机 + 引用
+│   ├── LlmConfigPanel.tsx               # DeepSeek Key/模型配置（env 未配时）
 │   └── ThemeToggle.tsx                  # 亮色/暗色双主题切换
+├── hooks/
+│   └── useLlmConfig.ts                  # LLM env 检测 + localStorage 凭据
 ├── lib/
+│   ├── llm-config.ts                    # LLM 凭据解析（env 优先）
 │   ├── db.ts                            # Drizzle 数据库连接
 │   ├── types.ts                         # 共享类型（Source）
 │   ├── parser.ts                        # PDF/DOCX 解析
@@ -185,7 +196,8 @@ npx drizzle-kit push
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `POST` | `/api/upload` | 上传 PDF/DOCX，自动解析 + 分段 + 向量化 |
-| `POST` | `/api/chat` | SSE 流式问答（event: sources/text/done/error） |
+| `POST` | `/api/chat` | SSE 流式问答（event: sources/text/done/error）；env 未配时可传 `llmApiKey`/`llmModel` |
+| `GET` | `/api/llm-config` | 检测服务端 LLM env 是否已配置（不返回密钥） |
 | `GET` | `/api/documents` | 获取最近上传的文档（首页自动加载） |
 | `POST` | `/api/documents` | 为文档补生成向量嵌入 |
 | `GET` | `/api/documents/:id` | 文档详情（全文） |

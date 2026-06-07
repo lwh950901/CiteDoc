@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { retrieveChunks, buildQAPrompt } from "@/lib";
 import type { RetrievedChunk } from "@/lib/retriever";
 import type { Source } from "@/lib/types";
-import OpenAI from "openai";
+import { createLlmClient, resolveLlmConfig } from "@/lib/llm-config";
 
 export const runtime = "nodejs";
 
@@ -17,19 +17,6 @@ const SSE_HEADERS = {
   "Cache-Control": "no-cache",
   Connection: "keep-alive",
 } as const;
-
-// ---- LLM 客户端（延迟初始化）----
-let _llmClient: OpenAI | null = null;
-
-function getLLMClient(): OpenAI {
-  if (!_llmClient) {
-    _llmClient = new OpenAI({
-      apiKey: process.env.LLM_API_KEY,
-      baseURL: process.env.LLM_BASE_URL,
-    });
-  }
-  return _llmClient;
-}
 
 // ---- SSE 辅助函数 ----
 
@@ -110,18 +97,25 @@ function parseReferences(
  */
 export async function POST(req: NextRequest) {
   try {
-    const { documentId, question, history } = (await req.json()) as {
-      documentId?: string;
-      question?: string;
-      history?: { role: "user" | "assistant"; content: string }[];
-    };
+    const { documentId, question, history, llmApiKey, llmModel } =
+      (await req.json()) as {
+        documentId?: string;
+        question?: string;
+        history?: { role: "user" | "assistant"; content: string }[];
+        llmApiKey?: string;
+        llmModel?: string;
+      };
 
     // ---- 1. 参数校验 ----
     if (!documentId || !question) {
       return sseResponse(streamError("缺少 documentId 或 question"));
     }
-    if (!process.env.LLM_API_KEY) {
-      return sseResponse(streamError("LLM_API_KEY 未配置，请在 Vercel 环境变量中添加"));
+
+    const llmConfig = resolveLlmConfig({ llmApiKey, llmModel });
+    if (!llmConfig) {
+      return sseResponse(
+        streamError("请先配置 DeepSeek API Key 和模型")
+      );
     }
     if (!process.env.SILICONFLOW_API_KEY) {
       return sseResponse(
@@ -148,9 +142,10 @@ export async function POST(req: NextRequest) {
       { role: "user" as const, content: userMessage },
     ];
 
-    const completion = await getLLMClient().chat.completions.create(
+    const llmClient = createLlmClient(llmConfig);
+    const completion = await llmClient.chat.completions.create(
       {
-        model: process.env.LLM_MODEL || "deepseek-chat",
+        model: llmConfig.model,
         messages,
         temperature: 0.3,
       },
@@ -207,7 +202,7 @@ export async function POST(req: NextRequest) {
       message.includes("Authentication")
     ) {
       return sseResponse(
-        streamError("LLM 调用失败，请检查 LLM_API_KEY 配置")
+        streamError("DeepSeek API Key 无效，请检查配置")
       );
     }
 

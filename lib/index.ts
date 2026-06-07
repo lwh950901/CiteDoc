@@ -7,3 +7,12 @@ export { embedChunks, getEmbeddingProgress } from "./embeddings";
 export type { RetrievedChunk } from "./retriever";
 export { retrieveChunks } from "./retriever";
 export { buildQAPrompt } from "./prompt";
+export type { ResolvedLlmConfig, LlmConfigRequestBody } from "./llm-config";
+export {
+  DEFAULT_LLM_MODEL,
+  DEFAULT_LLM_BASE_URL,
+  isServerEnvConfigured,
+  getServerEnvModel,
+  resolveLlmConfig,
+  createLlmClient,
+} from "./llm-config";
