@@ -102,24 +102,29 @@ export async function POST(request: NextRequest) {
 
       chunkCount = chunksResult.length;
 
-      // 异步生成向量嵌入（不阻塞上传响应）
-      embedChunks(doc.id)
-        .then((r) => {
-          const ok = r.filter((e) => e.success).length;
-          console.log(`[upload] embedding done: ${ok}/${r.length} chunks for doc ${doc.id}`);
-        })
-        .catch((e) =>
-          console.error(`[upload] embedding failed for doc ${doc.id}:`, e)
-        );
+      // 等待向量化完成（Vercel serverless 返回响应后会终止进程，不能 fire-and-forget）
+      const embedResults = await embedChunks(doc.id);
+      const embedOk = embedResults.filter((r) => r.success).length;
+      console.log(`[upload] embedding done: ${embedOk}/${embedResults.length} chunks for doc ${doc.id}`);
+
+      return NextResponse.json({
+        documentId: doc.id,
+        name: doc.name,
+        pageCount,
+        segments,
+        chunkCount,
+        embedding: { total: embedResults.length, success: embedOk },
+      });
     }
 
-    // ---- 8. 返回结果 ----
+    // ---- 8. 返回结果（无 chunk 时）----
     return NextResponse.json({
       documentId: doc.id,
       name: doc.name,
       pageCount,
       segments,
       chunkCount,
+      embedding: { total: 0, success: 0 },
     });
   } catch (error) {
     console.error("Upload API error:", error);

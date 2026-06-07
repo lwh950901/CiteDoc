@@ -6,6 +6,9 @@
     },
     "app/api/chat/route.ts": {
       "maxDuration": 30
+    },
+    "app/api/documents/[id]/embed/route.ts": {
+      "maxDuration": 30
     }
   }
 }

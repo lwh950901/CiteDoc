@@ -29,13 +29,18 @@ function DocUploadPanel({ onUpload }: { onUpload: (docId: string, name: string) 
         if (res.status === 413) setError("文件大小不能超过 10MB");
         else if (res.status === 429) setError("请求过于频繁，请稍后重试");
         else setError(data.error || "上传失败");
-        setUploading(false);
+        return;
+      }
+      if (data.embedding?.total > 0 && data.embedding.success === 0) {
+        setError("文档上传成功，但向量化失败，请检查 SILICONFLOW_API_KEY");
         return;
       }
       onUpload(data.documentId, data.name);
     } catch {
       setError("网络错误，请重试");
+    } finally {
       setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
@@ -58,7 +63,7 @@ function DocUploadPanel({ onUpload }: { onUpload: (docId: string, name: string) 
             opacity: uploading ? 0.6 : 1,
           }}
         >
-          {uploading ? "上传中…" : "选择文档"}
+          {uploading ? "上传并向量化中…" : "选择文档"}
         </label>
         {error && <p className="text-xs mt-3" style={{ color: 'var(--color-red)' }}>{error}</p>}
       </div>
@@ -71,6 +76,8 @@ export default function Home() {
   const [documentName, setDocumentName] = useState<string | null>(null);
   const [activeChunkId, setActiveChunkId] = useState<string | null>(null);
   const [docLoading, setDocLoading] = useState(true);
+  const [embedReady, setEmbedReady] = useState(false);
+  const [embedStatus, setEmbedStatus] = useState<"idle" | "loading" | "error">("idle");
 
   // 页面加载时自动获取最近上传的文档
   useEffect(() => {
@@ -89,6 +96,58 @@ export default function Home() {
       });
     return () => { cancelled = true; };
   }, []);
+
+  // 确保文档已完成向量化（修复历史上传未 embedding 的情况）
+  useEffect(() => {
+    if (!documentId) {
+      setEmbedReady(false);
+      setEmbedStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function ensureEmbeddings() {
+      setEmbedStatus("loading");
+      setEmbedReady(false);
+
+      try {
+        const progRes = await fetch(`/api/documents/${documentId}/embed`);
+        const prog = await progRes.json();
+        if (cancelled) return;
+
+        if (!progRes.ok || prog.total === 0) {
+          setEmbedStatus("error");
+          return;
+        }
+
+        if (prog.embedded >= prog.total) {
+          setEmbedReady(true);
+          setEmbedStatus("idle");
+          return;
+        }
+
+        const embedRes = await fetch(`/api/documents/${documentId}/embed`, {
+          method: "POST",
+        });
+        const result = await embedRes.json();
+        if (cancelled) return;
+
+        if (!embedRes.ok || result.success === 0) {
+          setEmbedStatus("error");
+          return;
+        }
+
+        setEmbedReady(true);
+        setEmbedStatus("idle");
+      } catch {
+        if (!cancelled) setEmbedStatus("error");
+      }
+    }
+
+    ensureEmbeddings();
+    return () => { cancelled = true; };
+  }, [documentId]);
 
   function handleUploadSuccess(docId: string, name: string) {
     setDocumentId(docId);
@@ -176,6 +235,16 @@ export default function Home() {
                 <ChatPanel
                   documentId={documentId}
                   onSourceClick={handleSourceClick}
+                  disabled={!embedReady || embedStatus === "loading"}
+                  disabledReason={
+                    embedStatus === "loading"
+                      ? "文档向量化中，请稍候…"
+                      : embedStatus === "error"
+                        ? "向量化失败，请检查 Vercel 中的 SILICONFLOW_API_KEY"
+                        : !embedReady
+                          ? "文档尚未完成向量化"
+                          : undefined
+                  }
                 />
               ) : (
                 <div className="flex-1 flex items-center justify-center" style={{ color: 'var(--color-text-muted)' }}>
