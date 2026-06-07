@@ -22,6 +22,26 @@ interface ChatPanelProps {
 
 type PanelState = "idle" | "loading" | "done" | "error";
 
+/** 解析单个 SSE 事件块，兼容 \r\n 换行 */
+function parseSSEPart(part: string): { event: string; data: string } | null {
+  const lines = part.replace(/\r\n/g, "\n").split("\n");
+  let event = "";
+  const dataLines: string[] = [];
+  for (const line of lines) {
+    if (line.startsWith("event:")) {
+      event = line.slice(6).trim();
+    } else if (line.startsWith("data:")) {
+      dataLines.push(line.slice(5).trimStart());
+    }
+  }
+  if (!event || dataLines.length === 0) return null;
+  return { event, data: dataLines.join("\n") };
+}
+
+function parseSSEJsonData<T>(rawData: string): T {
+  return JSON.parse(rawData) as T;
+}
+
 // ---- Component ----
 
 export default function ChatPanel({
@@ -106,6 +126,26 @@ export default function ChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  function finalizeAnswer() {
+    const answer = pendingAnswerRef.current;
+    if (answer) {
+      completedHistoryRef.current.push({ role: "assistant", content: answer });
+    }
+    setMessages((prev) => {
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      if (last && last.role === "assistant") {
+        copy[copy.length - 1] = {
+          ...last,
+          content: answer,
+          sources: pendingSourcesRef.current,
+        };
+      }
+      return copy;
+    });
+    setState("done");
+  }
+
   // ---- SSE 流解析 ----
 
   const handleAsk = useCallback(async () => {
@@ -175,22 +215,22 @@ export default function ChatPanel({
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
+        // 统一换行符，避免 Vercel/代理注入 \r\n 导致解析失败
+        buffer = buffer.replace(/\r\n/g, "\n");
         const parts = buffer.split("\n\n");
         buffer = parts.pop() || "";
 
         for (const part of parts) {
           if (!part.trim()) continue;
-          const eventMatch = part.match(/^event: (.+)$/m);
-          const dataMatch = part.match(/^data: (.+)$/m);
-          if (!eventMatch || !dataMatch) continue;
+          const parsed = parseSSEPart(part);
+          if (!parsed) continue;
 
-          const eventType = eventMatch[1].trim();
-          const rawData = dataMatch[1].trim();
+          const { event: eventType, data: rawData } = parsed;
 
           try {
             switch (eventType) {
             case "sources": {
-              pendingSourcesRef.current = JSON.parse(rawData) as Source[];
+              pendingSourcesRef.current = parseSSEJsonData<Source[]>(rawData);
               setMessages((prev) => {
                 const copy = [...prev];
                 const last = copy[copy.length - 1];
@@ -202,8 +242,7 @@ export default function ChatPanel({
               break;
             }
             case "text": {
-              const char = JSON.parse(rawData) as string;
-              // 第一个字符到达，清除 loading "…"
+              const chunk = parseSSEJsonData<string>(rawData);
               if (!firstCharRef.current) {
                 firstCharRef.current = true;
                 pendingAnswerRef.current = "";
@@ -216,7 +255,9 @@ export default function ChatPanel({
                   return copy;
                 });
               }
-              typewriterBufferRef.current.push(char);
+              for (const char of chunk) {
+                typewriterBufferRef.current.push(char);
+              }
               ensureTypewriter();
               break;
             }
@@ -227,38 +268,29 @@ export default function ChatPanel({
                 finalizeAnswer();
               }
               return;
-
-            // 辅助：完成当前 assistant 消息并记录 history
-            function finalizeAnswer() {
-              const answer = pendingAnswerRef.current;
-              if (answer) {
-                completedHistoryRef.current.push({ role: "assistant", content: answer });
-              }
-              setMessages((prev) => {
-                const copy = [...prev];
-                const last = copy[copy.length - 1];
-                if (last && last.role === "assistant") {
-                  copy[copy.length - 1] = {
-                    ...last,
-                    content: answer,
-                    sources: pendingSourcesRef.current,
-                  };
-                }
-                return copy;
-              });
-              setState("done");
-            }
-            case "error":
+            case "error": {
               clearTimeout(timeoutId);
               streamDoneRef.current = true;
               flushTypewriter();
-              setError(JSON.parse(rawData) as string);
+              let errMsg = rawData;
+              try {
+                errMsg = parseSSEJsonData<string>(rawData);
+              } catch {
+                // 服务端若未 JSON 编码，直接使用原始文本
+              }
+              setError(errMsg || "服务器错误");
               setMessages((prev) => prev.filter((m) => m.content !== "" || m.role === "user"));
               setState("error");
               return;
-          }
-          } catch {
-            setError("数据格式异常");
+            }
+            }
+          } catch (parseErr) {
+            console.error("SSE parse error:", eventType, rawData, parseErr);
+            setError(
+              eventType === "sources"
+                ? "引用数据解析失败，请重试"
+                : "数据格式异常，请重试"
+            );
             setState("error");
             clearTimeout(timeoutId);
             return;

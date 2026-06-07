@@ -4,9 +4,13 @@ import type { RetrievedChunk } from "@/lib/retriever";
 import type { Source } from "@/lib/types";
 import OpenAI from "openai";
 
+export const runtime = "nodejs";
+
 // ---- 常量 ----
 
 const LLM_TIMEOUT_MS = 30_000;
+/** 每条 SSE text 事件携带的字符数（避免逐字发送导致线上流解析失败） */
+const TEXT_CHUNK_SIZE = 80;
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream",
@@ -48,14 +52,23 @@ function streamError(message: string): ReadableStream<Uint8Array> {
   });
 }
 
+function streamTextAnswer(
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  text: string
+) {
+  for (let i = 0; i < text.length; i += TEXT_CHUNK_SIZE) {
+    controller.enqueue(
+      sseEvent("text", JSON.stringify(text.slice(i, i + TEXT_CHUNK_SIZE)))
+    );
+  }
+}
+
 function streamNoResult(): ReadableStream<Uint8Array> {
   const msg = "文档中未找到相关信息。";
   return new ReadableStream({
     start(controller) {
       controller.enqueue(sseEvent("sources", "[]"));
-      for (const char of msg) {
-        controller.enqueue(sseEvent("text", JSON.stringify(char)));
-      }
+      streamTextAnswer(controller, msg);
       controller.enqueue(sseEvent("done", "[DONE]"));
       controller.close();
     },
@@ -107,6 +120,14 @@ export async function POST(req: NextRequest) {
     if (!documentId || !question) {
       return sseResponse(streamError("缺少 documentId 或 question"));
     }
+    if (!process.env.LLM_API_KEY) {
+      return sseResponse(streamError("LLM_API_KEY 未配置，请在 Vercel 环境变量中添加"));
+    }
+    if (!process.env.SILICONFLOW_API_KEY) {
+      return sseResponse(
+        streamError("SILICONFLOW_API_KEY 未配置，请在 Vercel 环境变量中添加")
+      );
+    }
 
     // ---- 2. 向量检索 ----
     const retrieved = await retrieveChunks(question, documentId, 4);
@@ -149,10 +170,8 @@ export async function POST(req: NextRequest) {
         controller.enqueue(
           sseEvent("sources", JSON.stringify(sources))
         );
-        // 事件2: 逐字发送答案文本（前端打字机效果渲染）
-        for (const char of rawAnswer) {
-          controller.enqueue(sseEvent("text", JSON.stringify(char)));
-        }
+        // 事件2: 分块发送答案（前端打字机效果渲染）
+        streamTextAnswer(controller, rawAnswer);
         // 事件3: 结束
         controller.enqueue(sseEvent("done", "[DONE]"));
         controller.close();
