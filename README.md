@@ -141,7 +141,19 @@ npm run dev
    ```sql
    CREATE EXTENSION IF NOT EXISTS vector;
    ```
-3. 获取数据库连接字符串（Settings → Database → Connection string → URI）
+3. 获取 **Connection Pooler** 连接字符串（Supabase Dashboard → **Connect** → **Connection pooling** → **Transaction** 模式）
+
+   > **重要**：Vercel 不支持 IPv6，不能使用 Direct Connection（`db.xxx.supabase.co`）。必须使用 Pooler 地址（`xxx.pooler.supabase.com`）。
+
+   正确格式示例：
+   ```
+   postgresql://postgres.[project-ref]:[password]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
+   ```
+
+   常见错误：
+   - 使用 `db.xxx.supabase.co`（Direct，Vercel 会 ENOTFOUND）
+   - 域名写成 `.supabase.co` 而非 `.pooler.supabase.com`
+   - 端口用 5432 的 Direct 连接而非 Pooler 的 6543（Transaction 模式）
 
 ### 2. 执行数据库迁移
 

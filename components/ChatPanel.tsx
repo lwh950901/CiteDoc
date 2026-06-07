@@ -123,6 +123,9 @@ export default function ChatPanel({
     pendingSourcesRef.current = [];
     firstCharRef.current = false;
 
+    // 先构建 API 用的 history（不含当前问题）
+    const history = completedHistoryRef.current.slice();
+
     // 追加 user 消息并记录到 history ref
     const userMsg: Message = { role: "user", content: q };
     completedHistoryRef.current.push({ role: "user", content: q });
@@ -139,9 +142,6 @@ export default function ChatPanel({
     // 立即显示 AI 气泡占位（loading 动画），降低感知延迟
     const loadingMsg: Message = { role: "assistant", content: "…", sources: [] };
     setMessages((prev) => [...prev, loadingMsg]);
-
-    // 使用 ref 获取已完成的消息历史（避免依赖 setMessages 批处理时序）
-    const history = completedHistoryRef.current.slice();
 
     try {
       const res = await fetch("/api/chat", {
