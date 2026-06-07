@@ -9,6 +9,8 @@ import * as schema from "@/db/schema";
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
   ssl: process.env.DATABASE_URL?.includes("supabase") ? { rejectUnauthorized: false } : false,
+  // Vercel 环境强制 IPv4 + 连接超时
+  ...(process.env.VERCEL ? { family: 4, connectionTimeoutMillis: 10000 } : {}),
 });
 
 export const db = drizzle(pool, { schema });
