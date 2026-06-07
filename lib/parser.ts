@@ -1,4 +1,5 @@
 import type { Buffer } from "node:buffer";
+import pdfParse from "pdf-parse";
 
 // ---- 类型定义 ----
 
@@ -62,18 +63,8 @@ function splitIntoParagraphs(text: string): string[] {
  * - 回退方案基于 numpages 做均匀页码分配，并 console.warn 提示降级
  */
 async function parsePdf(fileBuffer: Buffer): Promise<ParseResult> {
-  // pdf-parse 是 CommonJS 模块，使用 require 以兼容 Next.js 打包环境
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse") as (
-    buf: Uint8Array,
-    options?: Record<string, unknown>
-  ) => Promise<{ text: string; numpages: number }>;
-
-  // pdf-parse 不接受 Node.js Buffer，需转换为 Uint8Array
-  const pdfBuffer = new Uint8Array(fileBuffer);
-
   // ---- 1. 无回调解析：获取可靠的全文和页数（适用于所有 PDF）----
-  const data = await pdfParse(pdfBuffer);
+  const data = await pdfParse(fileBuffer);
 
   // ---- 2. 尝试带 pagerender 的二次解析以获取每页文本（最佳努力）----
   // pagerender 对部分 PDF（如 pdf-lib 生成的非标准格式）会触发内部引擎崩溃
@@ -81,7 +72,7 @@ async function parsePdf(fileBuffer: Buffer): Promise<ParseResult> {
   const pageContents: string[] = [];
 
   try {
-    await pdfParse(pdfBuffer, {
+    await pdfParse(fileBuffer, {
       pagerender: function (pageData: unknown) {
         const pd = pageData as PDFPageData;
         if (typeof pd.getTextContent !== "function") {
