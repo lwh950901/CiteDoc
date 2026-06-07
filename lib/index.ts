@@ -4,3 +4,6 @@ export type { ChunkWithMeta, ChunkMetadata } from "./splitter";
 export { splitTextWithMeta } from "./splitter";
 export type { EmbeddingResult } from "./embeddings";
 export { embedChunks, getEmbeddingProgress } from "./embeddings";
+export type { RetrievedChunk } from "./retriever";
+export { retrieveChunks } from "./retriever";
+export { buildQAPrompt } from "./prompt";
