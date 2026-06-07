@@ -1,18 +1,20 @@
 # Code Review: Phase 3-4（文本切分 + 向量化）
 
-> **审查日期**: 2026-06-06 | **审查范围**: 8 个源文件
+> **审查日期**: 2026-06-06 | **审查范围**: 8 个源文件  
+> **最后更新**: 2026-06-07（Phase 5-6 修复联动更新）  
 > **审查标准**: role.md（TypeScript strict、禁止 any、完整错误处理、模块化）
 
 ---
 
 ## 总览
 
-| 严重度 | 数量 |
-|--------|------|
-| 🔴 Critical | 1 |
-| 🟡 High | 2 |
-| 🟢 Medium | 5 |
-| ⚪ Low | 5 |
+| 严重度 | 发现 | 已修复 | 待处理 |
+|--------|------|--------|--------|
+| 🔴 Critical | 1 | 1 | 0 |
+| 🟡 High | 2 | 0 | 2 |
+| 🟢 Medium | 5 | 1 | 4 |
+| ⚪ Low | 5 | 1 | 4 |
+| **总计** | **13** | **3** | **10** |
 
 ---
 
@@ -31,18 +33,11 @@
 
 ## 🔴 Critical
 
-### C-1. `getEmbeddingProgress` 返回值类型不一致
+### C-1. `getEmbeddingProgress` 返回值类型不一致 ✅ 已修复
 
 - **文件**: [lib/embeddings.ts:162-181](lib/embeddings.ts#L162-L181)
-- **问题**: 函数签名声明返回 `{ total: number, embedded: number }`，但 `sql<number>` 在运行时 PostgreSQL 返回的 count 是 **字符串**（如 `"3"` 而非 `3`）。curl 已验证：`"total":"3"`。
-- **影响**: 前端如果用 `===` 严格比较数字会失败。如果用作计算（如 `total - embedded`）会产生隐式字符串拼接。
-- **修复**: 使用 `Number()` 显式转换：
-  ```ts
-  return {
-    total: Number(totalRow?.count ?? 0),
-    embedded: Number(embeddedRow?.count ?? 0),
-  };
-  ```
+- **问题**: 函数签名声明返回 `{ total: number, embedded: number }`，但 `sql<number>` 在运行时 PostgreSQL 返回的 count 是 **字符串**（如 `"3"` 而非 `3`）。
+- **修复**: 已使用 `Number()` 显式转换（line 179-180）。
 
 ---
 
@@ -87,12 +82,12 @@
 - **影响**: 长时间挂起消耗连接池资源，用户体验差。
 - **修复**: 传递 `timeout: 30000` 到 `client.embeddings.create()` 或用 `AbortController`。
 
-### M-3. upload route 中文档入库和 chunk 入库无事务保护
+### M-3. upload route 中文档入库和 chunk 入库无事务保护 ⚠️ 部分修复
 
 - **文件**: [app/api/upload/route.ts:73-101](app/api/upload/route.ts#L73-L101)
-- **问题**: 文档 INSERT 成功但 chunks INSERT 失败时，documents 表有记录但 chunks 表为空。这是已知的 review M-4 仍未修复。
-- **影响**: 孤立文档记录，前端展示成功但无法向量化/检索。
-- **修复**: 后续考虑用 Drizzle 事务或异步两步流程。
+- **问题**: 文档 INSERT 成功但 chunks INSERT 失败时，documents 表有记录但 chunks 表为空。
+- **Phase 5-6 联动修复**: upload API 现已调用 `embedChunks(doc.id)` 在上传后自动生成向量嵌入（异步，不阻塞响应）。**核心痛点（上传后无 embedding）已解决**，但事务保护仍未添加。
+- **待处理**: 后续用 Drizzle 事务或异步两步流程保证原子性。
 
 ### M-4. `splitTextWithMeta` 中 fullText 末尾多余空格
 
@@ -118,11 +113,10 @@
 
 ## ⚪ Low
 
-### L-1. db/schema.ts 向量维度注释过时
+### L-1. db/schema.ts 向量维度注释过时 ✅ 已修复
 
 - **文件**: [db/schema.ts:34](db/schema.ts#L34)
-- **问题**: 注释写的是 "1536 维向量 (OpenAI text-embedding-ada-002)"，实际已改为 1024 维 BAAI/bge-m3。
-- **修复**: 更新注释为 "1024 维向量 (SiliconFlow BAAI/bge-m3)"。
+- **问题**: 注释曾写 "1536 维向量 (OpenAI text-embedding-ada-002)"，现已更新为 "1024 维向量 BAAI/bge-m3 (SiliconFlow)"。
 
 ### L-2. chunks route 中 `parsedMetadata: unknown` 类型
 
@@ -166,10 +160,13 @@
 
 ## 优先修复建议
 
-| 优先级 | 编号 | 问题 | 预计耗时 |
-|--------|------|------|---------|
-| 1 | C-1 | `getEmbeddingProgress` 类型不一致 | 2 min |
-| 2 | H-1 | embed API 缺少文档存在性校验 | 5 min |
-| 3 | H-2 | embed API 缺少并发保护 | 5 min |
-| 4 | M-1 | NATURAL_BREAKS 重复过滤优化 | 5 min |
-| 5 | M-4 | fullText 末尾多余空格 | 2 min |
+| 优先级 | 编号 | 问题 | 状态 |
+|--------|------|------|------|
+| 1 | C-1 | `getEmbeddingProgress` 类型不一致 | ✅ 已修复 |
+| 2 | H-1 | embed API 缺少文档存在性校验 | ⬜ 待处理 |
+| 3 | H-2 | embed API 缺少并发保护 | ⬜ 待处理 |
+| 4 | M-1 | NATURAL_BREAKS 重复过滤优化 | ⬜ 待处理 |
+| 5 | M-4 | fullText 末尾多余空格 | ⬜ 待处理 |
+| — | M-3 | upload 无事务保护 / 无 embedding | ⚠️ 部分修复（embedding 已添加） |
+| — | L-1 | schema 注释过时 | ✅ 已修复 |
+| — | L-5 | FileUpload 缺少 fetch 超时 | ⬜ 待处理 |

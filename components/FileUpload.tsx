@@ -12,7 +12,11 @@ interface UploadResult {
   segments: Segment[];
 }
 
-export default function FileUpload() {
+interface FileUploadProps {
+  onUploadSuccess?: (documentId: string) => void;
+}
+
+export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
   const [state, setState] = useState<UploadState>("idle");
   const [error, setError] = useState<string>("");
   const [result, setResult] = useState<UploadResult | null>(null);
@@ -48,6 +52,7 @@ export default function FileUpload() {
 
       setResult(data);
       setState("success");
+      onUploadSuccess?.(data.documentId);
     } catch (err) {
       setError("网络错误，请检查连接后重试");
       setState("error");
@@ -105,62 +110,21 @@ export default function FileUpload() {
         </div>
       )}
 
-      {/* ---- Success 状态 ---- */}
+      {/* ---- Success 状态（紧凑模式）---- */}
       {state === "success" && result && (
-        <div className="space-y-4">
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center gap-2 text-green-700 font-medium mb-2">
-              <span>✅</span>
-              <span>上传成功</span>
-            </div>
-            <dl className="text-sm text-gray-600 space-y-1">
-              <div className="flex gap-2">
-                <dt className="font-medium text-gray-500">文档 ID:</dt>
-                <dd className="font-mono text-xs break-all">{result.documentId}</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="font-medium text-gray-500">文件名:</dt>
-                <dd>{result.name}</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="font-medium text-gray-500">页数:</dt>
-                <dd>{result.pageCount}</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="font-medium text-gray-500">段落数:</dt>
-                <dd>{result.segments.length}</dd>
-              </div>
-            </dl>
-          </div>
-
-          {/* ---- 段落预览（前 5 个）---- */}
-          {result.segments.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-gray-500">
-                段落预览（前 {Math.min(5, result.segments.length)} 个）
-              </h3>
-              {result.segments.slice(0, 5).map((seg, i) => (
-                <div
-                  key={i}
-                  className="p-3 bg-white border border-gray-200 rounded-lg text-sm"
-                >
-                  <div className="text-xs text-gray-400 mb-1">
-                    第 {seg.page} 页 · 字符 {seg.charStart}-{seg.charEnd}
-                  </div>
-                  <div className="text-gray-700 line-clamp-2">
-                    {seg.content}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ---- 重新上传 ---- */}
+        <div className="flex items-center gap-3 py-1.5 px-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+          <span className="text-green-600">✅</span>
+          <span className="text-gray-700 font-medium truncate max-w-[60%]">
+            {result.name}
+          </span>
+          <span className="text-gray-400 text-xs whitespace-nowrap">
+            {result.pageCount} 页 · {result.segments.length} 段
+          </span>
           <button
             onClick={handleReset}
-            className="px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+            className="ml-auto px-3 py-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors font-medium shrink-0"
           >
-            ← 上传新文件
+            ← 换文件
           </button>
         </div>
       )}

@@ -4,6 +4,7 @@ import { documents, chunks } from "@/db/schema";
 import { parseDocument } from "@/lib/parser";
 import type { ParseResult } from "@/lib/parser";
 import { splitTextWithMeta } from "@/lib/splitter";
+import { embedChunks } from "@/lib/embeddings";
 
 // 允许的文件 MIME 类型
 const ALLOWED_TYPES = [
@@ -93,11 +94,20 @@ export async function POST(request: NextRequest) {
           documentId: chunk.metadata.documentId,
           content: chunk.content,
           metadata: JSON.stringify(chunk.metadata),
-          // embedding 暂不生成，留给 Phase 4 向量化
         });
       }
 
       chunkCount = chunksResult.length;
+
+      // 异步生成向量嵌入（不阻塞上传响应）
+      embedChunks(doc.id)
+        .then((r) => {
+          const ok = r.filter((e) => e.success).length;
+          console.log(`[upload] embedding done: ${ok}/${r.length} chunks for doc ${doc.id}`);
+        })
+        .catch((e) =>
+          console.error(`[upload] embedding failed for doc ${doc.id}:`, e)
+        );
     }
 
     // ---- 8. 返回结果 ----

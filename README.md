@@ -1,16 +1,30 @@
 # DocQATracer - 文档问答溯源工具
 
-带来源溯源的智能文档问答（RAG）Web 应用。上传 PDF/Word 文档后提问，AI 答案中的每条事实都可以点击跳转到原文对应位置并高亮显示。
+带来源溯源的智能文档问答（RAG）Web 应用。上传 PDF/Word 文档后提问，AI 答案中的每条引用都可以点击跳转到原文对应位置并高亮显示。
+
+![DocQATracer](https://img.shields.io/badge/Next.js-15+-black?logo=next.js) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql)
+
+## 功能特性
+
+- **📄 文档上传**: 支持 PDF / DOCX，自动解析、分段、向量化
+- **🔍 向量检索**: BAAI/bge-m3 1024 维嵌入 + pgvector 余弦相似度检索
+- **💬 流式问答**: SSE 逐字打字机效果，引用角标点击溯源
+- **🎯 溯源高亮**: 点击答案中的 [1] [2] 引用角标，左侧文档原文自动滚动到对应段落并高亮
+- **📖 双栏布局**: 左侧文档原文 + 右侧问答面板，响应式设计
 
 ## 技术栈
 
-- **框架**: Next.js 15+ (App Router)
-- **AI**: Vercel AI SDK + DeepSeek (deepseek-chat)
-- **嵌入模型**: OpenAI text-embedding-ada-002（向量化）
-- **数据库**: PostgreSQL + pgvector (向量检索)
-- **ORM**: Drizzle ORM
-- **样式**: Tailwind CSS
-- **文档解析**: pdf-parse, mammoth
+| 层级 | 技术 |
+|------|------|
+| 框架 | Next.js 15+ (App Router) |
+| 语言 | TypeScript (strict mode) |
+| LLM | DeepSeek deepseek-chat (OpenAI 兼容 API) |
+| 嵌入模型 | BAAI/bge-m3 via SiliconFlow API (1024 维) |
+| 向量数据库 | PostgreSQL + pgvector (HNSW 索引) |
+| ORM | Drizzle ORM |
+| 样式 | Tailwind CSS |
+| 文档解析 | pdf-parse + mammoth |
+| 流式通信 | Server-Sent Events (SSE) |
 
 ## 快速开始
 
@@ -18,7 +32,8 @@
 
 - Node.js 18+
 - Docker Desktop
-- DeepSeek API Key（注册地址：https://platform.deepseek.com）
+- DeepSeek API Key ([注册](https://platform.deepseek.com))
+- SiliconFlow API Key ([注册](https://siliconflow.cn)) — BAAI/bge-m3 免费使用
 
 ### 1. 启动数据库
 
@@ -26,82 +41,113 @@
 docker-compose up -d
 ```
 
-验证数据库连接：
-
-```bash
-docker exec -it docqa-pgvector psql -U postgres -d docqa -c "SELECT 1;"
-```
-
 ### 2. 配置环境变量
 
-编辑 `.env.local`，填入你的 DeepSeek API Key：
+复制 `.env.example` 为 `.env.local`，填入 API Key：
 
-```
+```env
 DATABASE_URL="postgres://postgres:postgres@localhost:5432/docqa"
-DEEPSEEK_API_KEY="sk-..."
+LLM_API_KEY="sk-..."              # DeepSeek API Key
+LLM_BASE_URL="https://api.deepseek.com/v1"
+LLM_MODEL="deepseek-chat"
+SILICONFLOW_API_KEY="sk-..."      # SiliconFlow API Key (向量嵌入)
 ```
 
-### 3. 安装依赖
+### 3. 安装 & 迁移
 
 ```bash
 npm install --legacy-peer-deps
-```
-
-### 4. 运行数据库迁移
-
-```bash
-# 生成迁移文件
-npx drizzle-kit generate
-
-# 应用到数据库
 npx drizzle-kit push
 ```
 
-### 5. 启动开发服务器
+### 4. 启动
 
 ```bash
 npm run dev
 ```
 
-访问 [http://localhost:3000](http://localhost:3000)
-
-### 6. 验证环境
-
-打开页面后，点击"🔌 测试连接"按钮，如果看到流式输出"👋 环境已就绪，AI 连接成功！"，说明环境搭建成功。
+访问 [http://localhost:3000](http://localhost:3000)，上传文档即可开始问答。
 
 ## 项目结构
 
 ```
 ├── app/
 │   ├── api/
-│   │   ├── upload/route.ts      # 文件上传处理
-│   │   ├── chat/route.ts        # 问答流式接口
-│   │   └── documents/route.ts   # 文档列表/删除
-│   ├── layout.tsx               # 根布局
-│   ├── page.tsx                 # 主界面
-│   └── globals.css
-├── components/                  # UI 组件
+│   │   ├── upload/route.ts              # 文件上传 + 自动向量化
+│   │   ├── chat/route.ts                # SSE 流式问答
+│   │   └── documents/
+│   │       ├── route.ts                 # 文档列表 / 补生成嵌入
+│   │       └── [id]/
+│   │           ├── route.ts             # 文档详情
+│   │           ├── chunks/route.ts      # 文档分段
+│   │           └── embed/route.ts       # 向量嵌入
+│   ├── layout.tsx
+│   ├── page.tsx                         # 主界面（双栏布局）
+│   └── globals.css                      # highlight-pulse 动画
+├── components/
+│   ├── FileUpload.tsx                   # 文件上传（紧凑模式）
+│   ├── DocumentViewer.tsx               # 文档原文 + chunk 高亮
+│   └── ChatPanel.tsx                    # 流式问答 + 打字机 + 引用
 ├── lib/
-│   ├── db.ts                    # Drizzle 连接
-│   ├── parser.ts                # 文档解析 + 分割
-│   ├── embeddings.ts            # 向量化
-│   ├── retriever.ts             # 检索逻辑
-│   └── prompt.ts                # Prompt 模板
+│   ├── db.ts                            # Drizzle 数据库连接
+│   ├── types.ts                         # 共享类型（Source）
+│   ├── parser.ts                        # PDF/DOCX 解析
+│   ├── splitter.ts                      # 滑动窗口文本切分
+│   ├── embeddings.ts                    # BGE-M3 批量向量化
+│   ├── retriever.ts                     # pgvector 余弦相似度检索
+│   ├── prompt.ts                        # RAG Prompt 模板
+│   └── index.ts                         # 统一导出
 ├── db/
-│   ├── schema.ts                # 表结构定义
-│   └── migrations/              # 迁移文件
-├── docker-compose.yml           # 本地 pgvector
-└── .env.local                   # 环境变量
+│   ├── schema.ts                        # documents / chunks 表
+│   └── migrations/
+├── openspec/
+│   ├── specs/                           # 主能力规格
+│   └── changes/archive/                 # 已归档 change
+├── reviews/                             # Code Review 报告
+├── docker-compose.yml
+├── .env.example
+└── .env.local
+```
+
+## API 端点
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/upload` | 上传 PDF/DOCX，自动解析 + 分段 + 向量化 |
+| `POST` | `/api/chat` | SSE 流式问答（event: sources/text/done/error） |
+| `GET` | `/api/documents` | 获取最近上传的文档（首页自动加载） |
+| `POST` | `/api/documents` | 为文档补生成向量嵌入 |
+| `GET` | `/api/documents/:id` | 文档详情（全文） |
+| `GET` | `/api/documents/:id/chunks` | 文档分段列表 |
+| `POST` | `/api/documents/:id/embed` | 触发向量嵌入 |
+| `GET` | `/api/documents/:id/embed` | 查询向量化进度 |
+
+## SSE 事件格式
+
+```
+event: sources
+data: [{"id":1,"page":3,"chunkId":"...","charStart":2601,...}]
+
+event: text
+data: "根"
+
+event: text
+data: "据"
+
+event: done
+data: "[DONE]"
+
+event: error
+data: "错误信息"
 ```
 
 ## 开发路线
 
-1. ✅ 环境搭建 (当前阶段)
-2. 文件上传与解析
-3. 文本分割与向量化
-4. 基础问答接口 (RAG)
-5. 流式改造
-6. 前端溯源交互
-7. 错误处理与美化
-8. 多轮对话
-9. 部署
+- [x] Phase 1: 环境搭建
+- [x] Phase 2: 文档上传与解析
+- [x] Phase 3: 文本智能切分
+- [x] Phase 4: 向量化存储
+- [x] Phase 5: RAG 问答系统
+- [x] Phase 6: 流式问答 + 溯源交互 + P0 优化
+- [ ] Phase 7: 多轮对话
+- [ ] Phase 8: 部署

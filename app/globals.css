@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes highlight-pulse {
+  0% {
+    background-color: #fef08a;
+    box-shadow: 0 0 0 2px #facc15;
+  }
+  60% {
+    background-color: #fef9c3;
+    box-shadow: 0 0 0 2px #fde68a;
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+
+.chunk-highlight {
+  animation: highlight-pulse 2s ease-out forwards;
+}
