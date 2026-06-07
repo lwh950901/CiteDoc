@@ -1,7 +1,6 @@
 {
   "functions": {
     "app/api/upload/route.ts": {
-      "memory": 512,
       "maxDuration": 30
     },
     "app/api/chat/route.ts": {
