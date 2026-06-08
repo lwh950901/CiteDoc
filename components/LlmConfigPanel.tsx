@@ -5,11 +5,12 @@ import type { LlmCredentials } from "@/hooks/useLlmConfig";
 
 interface LlmConfigPanelProps {
   onSave: (credentials: LlmCredentials) => void;
+  initialCredentials?: LlmCredentials;
 }
 
-export default function LlmConfigPanel({ onSave }: LlmConfigPanelProps) {
-  const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("deepseek-chat");
+export default function LlmConfigPanel({ onSave, initialCredentials }: LlmConfigPanelProps) {
+  const [apiKey, setApiKey] = useState(initialCredentials?.apiKey || "");
+  const [model, setModel] = useState(initialCredentials?.model || "deepseek-v4-flash");
   const [fieldError, setFieldError] = useState("");
 
   function handleSave() {
@@ -69,7 +70,7 @@ export default function LlmConfigPanel({ onSave }: LlmConfigPanelProps) {
               type="text"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder="deepseek-chat"
+              placeholder="deepseek-v4-flash"
               className="w-full px-4 py-2.5 rounded-xl text-sm"
               style={{
                 background: "var(--color-bg-surface)",

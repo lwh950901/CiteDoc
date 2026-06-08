@@ -156,38 +156,18 @@ export default function Home() {
   const skipAutoLoadRef = useRef(false);
 
   // 后台加载最近文档，不阻塞整页渲染
+  // 从 localStorage 恢复上次上传的文档（多用户互不干扰）
   useEffect(() => {
-    let ignore = false;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10_000);
-
-    async function loadRecentDocument() {
-      try {
-        const res = await fetch("/api/documents", { signal: controller.signal });
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          documentId: string | null;
-          name?: string;
-        };
-        if (ignore || skipAutoLoadRef.current || !data.documentId) return;
-        setDocumentId((current) => current ?? data.documentId);
-        if (data.name) {
-          setDocumentName((current) => current ?? data.name ?? null);
-        }
-      } catch {
-        // 超时或网络错误：保持上传入口，用户可手动上传
-      } finally {
-        clearTimeout(timeoutId);
+    if (skipAutoLoadRef.current) return;
+    try {
+      const savedId = localStorage.getItem("citedoc-doc-id");
+      const savedName = localStorage.getItem("citedoc-doc-name");
+      if (savedId) {
+        setDocumentId(savedId);
+        setDocumentName(savedName || null);
       }
-    }
-
-    loadRecentDocument();
-    return () => {
-      ignore = true;
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
-  }, []);
+    } catch {}
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 确保文档已完成向量化（修复历史上传未 embedding 的情况）
   useEffect(() => {
@@ -250,6 +230,7 @@ export default function Home() {
     setDocumentId(docId);
     setDocumentName(name);
     setActiveChunkId(null);
+    try { localStorage.setItem("citedoc-doc-id", docId); localStorage.setItem("citedoc-doc-name", name); } catch {}
     setMobileTab("chat");
   }
 
@@ -288,25 +269,6 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          {documentId && (
-            <button
-              type="button"
-              onClick={() => {
-                markUserDocumentAction();
-                setDocumentId(null);
-                setDocumentName(null);
-                setMobileTab("doc");
-              }}
-              className="text-xs px-3 py-1.5 rounded-lg transition-all duration-200"
-              style={{
-                fontFamily: "DM Sans, sans-serif",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text-muted)",
-              }}
-            >
-              上传新文档
-            </button>
-          )}
         </div>
       </header>
 
@@ -357,7 +319,7 @@ export default function Home() {
                   <p className="text-sm opacity-30">检查 LLM 配置…</p>
                 </div>
               ) : !llmReady || showConfigPanel ? (
-                <LlmConfigPanel onSave={saveCredentials} />
+                <LlmConfigPanel onSave={saveCredentials} initialCredentials={llmCredentials} />
               ) : documentId ? (
                 <ChatPanel
                   documentId={documentId}

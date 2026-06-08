@@ -21,6 +21,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
+        <link rel="icon" type="image/png" href="/favicon.png" />
         {/* 防闪烁：页面加载前读取 localStorage */}
         <script
           dangerouslySetInnerHTML={{

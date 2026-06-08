@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-export const DEFAULT_LLM_MODEL = "deepseek-chat";
+export const DEFAULT_LLM_MODEL = "deepseek-v4-flash";
 export const DEFAULT_LLM_BASE_URL = "https://api.deepseek.com/v1";
 
 export interface ResolvedLlmConfig {
